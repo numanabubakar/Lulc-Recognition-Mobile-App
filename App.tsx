@@ -241,13 +241,6 @@ function Dashboard() {
         )}
       </ScrollView>
 
-      {/* ── Footer ── */}
-      <View style={[styles.footer, { paddingBottom: insets.bottom || 12 }]}>
-        <Text style={styles.footerText}>
-          LULC Recognition System By Khadijah Shabbir & Numan Abubakar
-        </Text>
-      </View>
-
       <AppSettings
         isOpen={settingsVisible}
         onClose={() => setSettingsVisible(false)}

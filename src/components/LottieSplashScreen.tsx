@@ -7,17 +7,25 @@ const { width } = Dimensions.get('window');
 export function LottieSplashScreen() {
   return (
     <View style={styles.container}>
-      <View style={styles.animationContainer}>
-        <LottieView
-          source={{ uri: 'https://lottie.host/76d75605-e45c-428a-8611-655a68735593/fS5E2UvR71.json' }}
-          autoPlay
-          loop
-          style={styles.animation}
-        />
+      <View style={styles.content}>
+        <View style={styles.animationContainer}>
+          <LottieView
+            source={require('../../satellite_moon_astronaut.json')}
+            autoPlay
+            loop
+            style={styles.animation}
+          />
+        </View>
+        <View style={styles.textContainer}>
+          <Text style={styles.title}>LULC Recognition</Text>
+          <Text style={styles.subtitle}> AMFRNet Architecture</Text>
+        </View>
       </View>
-      <View style={styles.textContainer}>
-        <Text style={styles.title}>LULC AI</Text>
-        <Text style={styles.subtitle}>Deep Learning Recognition System</Text>
+
+      <View style={styles.footer}>
+        <Text style={styles.footerText}>
+          Developed By{"\n"}Khadijah Shabbir & Numan Abubakar
+        </Text>
       </View>
     </View>
   );
@@ -27,6 +35,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#020617',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 40,
+  },
+  content: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -54,5 +68,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     letterSpacing: 1,
     textTransform: 'uppercase',
+  },
+  footer: {
+    alignItems: 'center',
+  },
+  footerText: {
+    fontSize: 12,
+    color: '#475569', // slate-500
+    textAlign: 'center',
+    lineHeight: 18,
+    opacity: 0.8,
   },
 });
