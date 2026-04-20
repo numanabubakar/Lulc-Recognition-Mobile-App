@@ -74,102 +74,52 @@ export class LulcService {
       uploadUri = imageUri;
     }
 
-    // 2. Data Preparation
-    const formData = new FormData();
-    
-    // 2.1. Append non-file fields FIRST (Some FastAPI versions prefer this)
-    formData.append('model_type', modelType);
-
-    // 2.2. URI Handling Logic
-    let finalUri = uploadUri;
-    if (Platform.OS === 'android') {
-      const needsPrefix = !uploadUri.startsWith('file://') && !uploadUri.startsWith('content://');
-      if (needsPrefix) {
-        finalUri = `file://${uploadUri}`;
-      }
-    }
-
-    // 2.3. Append File with sanitized name and explicit MIME
-    const safeName = fileName?.includes('.') ? fileName : `${fileName || 'image'}.jpg`;
-    formData.append('file', {
-      uri: finalUri,
-      name: safeName,
-      type: mimeType || 'image/jpeg',
-    } as any);
-
-    // 3. Request Execution with Diagnostics
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
-
+    // 2. Blob-Stream Implementation
+    // Read the file locally first to ensure the native layer has full access to the bits
+    let blob: Blob;
     try {
-      // 3.1. Pre-flight Health Check
-      try {
-        const healthCheck = await fetch(BACKEND_URL, { 
-          method: 'GET', 
-          signal: controller.signal,
-          headers: {
-            'Cache-Control': 'no-cache',
-            'User-Agent': 'Mozilla/5.0 (Mobile) LulcApp/1.0',
-          }
-        });
-        if (!healthCheck.ok && healthCheck.status !== 405) {
-          console.warn(`Health check returned status: ${healthCheck.status}`);
-        }
-      } catch (healthError: any) {
-        throw new Error(`HEALTH_CHECK_FAILED: ${healthError.message}`);
-      }
-
-      // 3.2. Actual Inference Request
-      const response = await fetch(`${BACKEND_URL}/predict`, {
-        method: 'POST',
-        body: formData,
-        signal: controller.signal,
-        headers: {
-          'Accept': 'application/json',
-          // OMITTING custom Origin/Referer to avoid pre-flight certificate issues
-          // OMITTING Content-Type to let fetch set the multipart boundary automatically
-        },
-      });
-
-      clearTimeout(timeoutId);
-
-      // Handle 503 Service Unavailable (Hugging Face Sleeping)
-      if (response.status === 503 || response.status === 504) {
-        throw new Error('SERVER_SLEEPING');
-      }
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || `Server error: ${response.status}`);
-      }
-
-      const result: LulcPredictionResponse = await response.json();
-      return result;
-    } catch (error: any) {
-      clearTimeout(timeoutId);
-      
-      // Detailed error mapping
-      if (error.message?.startsWith('HEALTH_CHECK_FAILED')) {
-        throw new Error(
-          'Server unreachable. Please check your internet connection and ensure you aren\'t behind a firewall blocking Hugging Face.'
-        );
-      }
-
-      if (error.message === 'Network request failed') {
-        throw new Error(
-          'Inference request failed at the network level. This usually happens if the upload is blocked or the server rejected the binary data.'
-        );
-      }
-      
-      if (error.name === 'AbortError') {
-        throw new Error('The request timed out (60s). The server might be taking too long to process the image.');
-      }
-      
-      if (error.message === 'SERVER_SLEEPING') {
-        throw new Error('The backend server is currently waking up. Please wait about 30 seconds and try again.');
-      }
-
-      throw error;
+      const localResponse = await fetch(uploadUri);
+      blob = await localResponse.blob();
+    } catch (localError) {
+      console.error('[LULC] Failed to read local file:', localError);
+      throw new Error('Could not read the selected image file from your device.');
     }
+
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      
+      xhr.open('POST', `${BACKEND_URL}/predict`);
+      
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            resolve(JSON.parse(xhr.responseText));
+          } catch (e) {
+            reject(new Error('Server returned invalid data format.'));
+          }
+        } else {
+          reject(new Error(`Server Error (${xhr.status}): ${xhr.responseText || 'Check network'}`));
+        }
+      };
+      
+      xhr.onerror = () => {
+        console.error('[LULC] XHR Detailed Failure:', xhr);
+        reject(new Error('Network request failed. Your device connection to Hugging Face was rejected.'));
+      };
+
+      xhr.timeout = 60000;
+      
+      // Browser-Mimicking Headers to bypass HF Proxy/Cloudflare
+      xhr.setRequestHeader('Accept', 'application/json, text/plain, */*');
+      xhr.setRequestHeader('Origin', 'https://huggingface.co');
+      xhr.setRequestHeader('Referer', 'https://huggingface.co/spaces/Lulc-Recognition/lulc-backend');
+      xhr.setRequestHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36');
+      
+      const formData = new FormData();
+      formData.append('file', blob, 'image.jpg');
+      formData.append('model_type', modelType);
+      
+      xhr.send(formData);
+    });
   }
 }
