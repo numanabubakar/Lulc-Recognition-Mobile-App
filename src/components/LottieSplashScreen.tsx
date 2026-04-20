@@ -60,6 +60,8 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     color: '#ffffff',
     letterSpacing: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   subtitle: {
     fontSize: 14,

@@ -90,6 +90,8 @@ function Dashboard() {
         selectedDataset,
         imgWidth,
         imgHeight,
+        imageMime || 'image/jpeg',
+        imageName || 'image.jpg',
       );
       
       // Adapt result for PredictionResults if needed (it already matches LulcPredictionResponse mostly)
