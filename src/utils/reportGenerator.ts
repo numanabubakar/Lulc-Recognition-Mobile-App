@@ -1,13 +1,22 @@
 import RNPrint from 'react-native-print';
 import Share from 'react-native-share';
+import RNFS from 'react-native-fs';
 import { Platform, Alert } from 'react-native';
 import type { PredictionResult } from '../components/PredictionResults';
 
 export const generateProfessionalReport = async (
   result: PredictionResult,
-  originalImageBase64: string
+  originalImageUri: string
 ) => {
   try {
+    let finalImageB64 = originalImageUri;
+
+    // If it's a local file path, read it as base64
+    if (originalImageUri.startsWith('file://') || originalImageUri.startsWith('content://')) {
+      const cleanUri = originalImageUri.replace('file://', '');
+      const base64Data = await RNFS.readFile(cleanUri, 'base64');
+      finalImageB64 = `data:image/jpeg;base64,${base64Data}`;
+    }
     const timestamp = new Date().toLocaleString();
     const modelName = result.model_type.toUpperCase();
     
@@ -67,7 +76,7 @@ export const generateProfessionalReport = async (
               
               <div class="section-title" style="margin-top: 20px;">Input Satellite Image</div>
               <div class="image-container">
-                <img src="${originalImageBase64}" class="main-img" />
+                <img src="${finalImageB64}" class="main-img" />
               </div>
             </div>
             
@@ -121,31 +130,24 @@ export const generateProfessionalReport = async (
 
         <div class="footer">
           <p>Confidence: ${result.confidence.toFixed(6)} | Source Hash Verification: OK</p>
+          <p style="font-weight: bold; color: #4f46e5; margin-top: 5px;">DEVELOPED BY: KHADIJAH</p>
           <p>This report is computer-generated for environmental research and monitoring purposes.</p>
         </div>
       </body>
       </html>
     `;
 
-    // react-native-print's html-to-pdf converter is much more stable
-    const file = await RNPrint.convert({
+    // We use the system's native print engine which is 100% reliable
+    // This will open a dialog where the user can "Save as PDF" or print directly
+    await RNPrint.print({
       html: htmlContent,
-      base64: false,
     });
-    
-    if (file && file.url) {
-      console.log('[LULC] PDF Generated at:', file.url);
-      await Share.open({
-        url: file.url,
-        type: 'application/pdf',
-        title: 'Share LULC Recognition Report',
-      });
-    }
+
   } catch (error: any) {
     console.error('[LULC] PDF Error:', error);
     Alert.alert(
       'Report Error', 
-      `Technical Error: ${error?.message || 'Check if you have rebuilt the app with npm run android'}`
+      `Technical Error: ${error?.message || 'Check if you have rebuilt the app'}`
     );
   }
 };
