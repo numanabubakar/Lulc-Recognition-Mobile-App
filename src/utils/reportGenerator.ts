@@ -19,7 +19,7 @@ export const generateProfessionalReport = async (
     }
     const timestamp = new Date().toLocaleString();
     const modelName = result.model_type.toUpperCase();
-    
+
     // Construct HTML for the PDF
     const htmlContent = `
       <!DOCTYPE html>
@@ -130,7 +130,7 @@ export const generateProfessionalReport = async (
 
         <div class="footer">
           <p>Confidence: ${result.confidence.toFixed(6)} | Source Hash Verification: OK</p>
-          <p style="font-weight: bold; color: #4f46e5; margin-top: 5px;">DEVELOPED BY: KHADIJAH</p>
+          <p style="font-weight: bold; color: #4f46e5; margin-top: 5px;">Develop By Khadijah Shabir & Numan Abubakar</p>
           <p>This report is computer-generated for environmental research and monitoring purposes.</p>
         </div>
       </body>
@@ -146,7 +146,7 @@ export const generateProfessionalReport = async (
   } catch (error: any) {
     console.error('[LULC] PDF Error:', error);
     Alert.alert(
-      'Report Error', 
+      'Report Error',
       `Technical Error: ${error?.message || 'Check if you have rebuilt the app'}`
     );
   }
