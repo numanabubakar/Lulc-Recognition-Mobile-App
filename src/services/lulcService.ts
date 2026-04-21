@@ -7,7 +7,7 @@ const BACKEND_URL = 'https://lulc-recognition-lulc-backend.hf.space';
 export interface LulcPredictionResponse {
   predicted_class: string;
   confidence: number;
-  explain_maps: Record<string, string>;
+  explainability_maps: Record<string, string>;
   class_index?: number;
   all_predictions?: any[];
   inference_time_ms?: number;
@@ -74,52 +74,45 @@ export class LulcService {
       uploadUri = imageUri;
     }
 
-    // 2. Blob-Stream Implementation
-    // Read the file locally first to ensure the native layer has full access to the bits
-    let blob: Blob;
+    // 2. Reliable Base64-JSON Implementation (The Final Fix)
     try {
+      // Step A: Read local file and convert to Base64
       const localResponse = await fetch(uploadUri);
-      blob = await localResponse.blob();
-    } catch (localError) {
-      console.error('[LULC] Failed to read local file:', localError);
-      throw new Error('Could not read the selected image file from your device.');
+      const blob = await localResponse.blob();
+      
+      const base64Data = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          resolve(reader.result as string);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+
+      // Step B: Send as clean JSON to the new endpoint
+      const response = await fetch(`${BACKEND_URL}/predict_mobile`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'X-Request-Source': 'LulcMobileApp',
+        },
+        body: JSON.stringify({
+          image_b64: base64Data,
+          model_type: String(modelType).trim().toLowerCase(),
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Backend Error' }));
+        console.error('[LULC] Server Rejection:', JSON.stringify(errorData));
+        throw new Error(`Server Rejected: ${JSON.stringify(errorData.detail || errorData)}`);
+      }
+
+      return await response.json();
+    } catch (error: any) {
+      console.error('[LULC] Inference Process Failed:', error);
+      throw error;
     }
-
-    return new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      
-      xhr.open('POST', `${BACKEND_URL}/predict`);
-      
-      xhr.onload = () => {
-        if (xhr.status >= 200 && xhr.status < 300) {
-          try {
-            resolve(JSON.parse(xhr.responseText));
-          } catch (e) {
-            reject(new Error('Server returned invalid data format.'));
-          }
-        } else {
-          reject(new Error(`Server Error (${xhr.status}): ${xhr.responseText || 'Check network'}`));
-        }
-      };
-      
-      xhr.onerror = () => {
-        console.error('[LULC] XHR Detailed Failure:', xhr);
-        reject(new Error('Network request failed. Your device connection to Hugging Face was rejected.'));
-      };
-
-      xhr.timeout = 60000;
-      
-      // Browser-Mimicking Headers to bypass HF Proxy/Cloudflare
-      xhr.setRequestHeader('Accept', 'application/json, text/plain, */*');
-      xhr.setRequestHeader('Origin', 'https://huggingface.co');
-      xhr.setRequestHeader('Referer', 'https://huggingface.co/spaces/Lulc-Recognition/lulc-backend');
-      xhr.setRequestHeader('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36');
-      
-      const formData = new FormData();
-      formData.append('file', blob, 'image.jpg');
-      formData.append('model_type', modelType);
-      
-      xhr.send(formData);
-    });
   }
 }

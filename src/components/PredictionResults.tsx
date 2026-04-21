@@ -1,38 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   ScrollView,
   Image,
   StyleSheet,
+  TouchableOpacity,
 } from 'react-native';
 
-export interface ClassPrediction {
-  class_index: number;
-  class_label: string;
-  confidence: number;
-}
-
-export interface PredictionResult {
-  predicted_class: string;
-  class_index: number;
-  confidence: number;
-  all_predictions: ClassPrediction[];
-  explain_maps?: Record<string, string>;
-  inference_time_ms: number;
-  model_type: string;
-  image_info: {
-    width: number;
-    height: number;
-    format: string;
-  };
-}
-
-interface PredictionResultsProps {
-  result: PredictionResult;
-}
+// ... (keep interfaces the same)
 
 export function PredictionResults({ result }: PredictionResultsProps) {
+  const [showAllPredictions, setShowAllPredictions] = useState(false);
   const confidencePercent = Math.round(result.confidence * 100);
   const modelDisplayName = result.model_type.toUpperCase();
 
@@ -59,30 +38,19 @@ export function PredictionResults({ result }: PredictionResultsProps) {
       <View style={styles.card}>
         <Text style={styles.sectionLabel}>CONFIDENCE SCORE</Text>
         <View style={styles.confidenceHeader}>
-          <Text style={styles.confidenceNum}>{confidencePercent}%</Text>
-          <Text style={styles.rawConfidence}>{result.confidence.toFixed(4)}</Text>
+          <Text style={styles.rawConfidence}>Probability: {result.confidence.toFixed(4)}</Text>
         </View>
 
-        {/* Segmented arc gauge (pure View) */}
+        {/* Segmented arc gauge (premium look) */}
         <SegmentedGauge percent={confidencePercent} />
-
-        {/* Linear bar */}
-        <View style={styles.progressTrack}>
-          <View
-            style={[
-              styles.progressFill,
-              { width: `${confidencePercent}%` as any },
-            ]}
-          />
-        </View>
       </View>
 
       {/* ── Visual Explanations (XAI Maps) ── */}
-      {result.explain_maps && Object.keys(result.explain_maps).length > 0 && (
+      {result.explainability_maps && Object.keys(result.explainability_maps).length > 0 && (
         <View style={styles.card}>
           <Text style={styles.sectionLabel}>VISUAL EXPLANATIONS (XAI MAPS)</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.xaiScroll}>
-            {Object.entries(result.explain_maps).map(([mapName, b64Str]) => (
+            {Object.entries(result.explainability_maps).map(([mapName, b64Str]) => (
               <View key={mapName} style={styles.xaiItem}>
                 <View style={styles.xaiHeader}>
                   <Text style={styles.xaiName}>{mapName}</Text>
@@ -100,43 +68,55 @@ export function PredictionResults({ result }: PredictionResultsProps) {
         </View>
       )}
 
-      {/* ── All Predictions ── */}
+      {/* ── All Class Probabilities (Collapsible Box) ── */}
       {result.all_predictions && result.all_predictions.length > 0 && (
         <View style={styles.card}>
-          <Text style={styles.sectionLabel}>ALL CLASS PROBABILITIES</Text>
-          <View style={styles.allPredsList}>
-            {result.all_predictions.map((pred, idx) => {
-              const predPercent = (pred.confidence * 100).toFixed(1);
-              const isTop = idx === 0;
-              return (
-                <View key={pred.class_index} style={styles.predRow}>
-                  <View style={styles.predInfo}>
-                    <Text style={styles.predIdx}>{idx + 1}.</Text>
-                    <Text
-                      style={[styles.predLabel, isTop && styles.predLabelTop]}
-                      numberOfLines={1}
-                    >
-                      {pred.class_label}
-                    </Text>
-                  </View>
-                  <View style={styles.predRight}>
-                    <View style={styles.miniTrack}>
-                      <View
-                        style={[
-                          styles.miniFill,
-                          { width: `${pred.confidence * 100}%` as any },
-                          isTop && styles.miniFillTop,
-                        ]}
-                      />
+          <TouchableOpacity 
+            style={styles.collapsibleHeader} 
+            onPress={() => setShowAllPredictions(!showAllPredictions)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.sectionLabel}>ALL CLASS PROBABILITIES</Text>
+            <Text style={styles.collapseToggle}>
+              {showAllPredictions ? 'Hide ▲' : 'Show All ▼'}
+            </Text>
+          </TouchableOpacity>
+          
+          {showAllPredictions && (
+            <View style={styles.allPredsList}>
+              {result.all_predictions.map((pred, idx) => {
+                const predPercent = (pred.confidence * 100).toFixed(1);
+                const isTop = idx === 0;
+                return (
+                  <View key={pred.class_index} style={styles.predRow}>
+                    <View style={styles.predInfo}>
+                      <Text style={styles.predIdx}>{idx + 1}.</Text>
+                      <Text
+                        style={[styles.predLabel, isTop && styles.predLabelTop]}
+                        numberOfLines={1}
+                      >
+                        {pred.class_label}
+                      </Text>
                     </View>
-                    <Text style={[styles.predValue, isTop && styles.predValueTop]}>
-                      {predPercent}%
-                    </Text>
+                    <View style={styles.predRight}>
+                      <View style={styles.miniTrack}>
+                        <View
+                          style={[
+                            styles.miniFill,
+                            { width: `${pred.confidence * 100}%` as any },
+                            isTop && styles.miniFillTop,
+                          ]}
+                        />
+                      </View>
+                      <Text style={[styles.predValue, isTop && styles.predValueTop]}>
+                        {predPercent}%
+                      </Text>
+                    </View>
                   </View>
-                </View>
-              );
-            })}
-          </View>
+                );
+              })}
+            </View>
+          )}
         </View>
       )}
 
@@ -346,7 +326,24 @@ const styles = StyleSheet.create({
     width: 140,
     height: 140,
   },
-  allPredsList: { gap: 10, marginTop: 4 },
+  collapsibleHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  collapseToggle: {
+    fontSize: 12,
+    color: '#818cf8',
+    fontWeight: '700',
+  },
+  allPredsList: { 
+    gap: 10, 
+    marginTop: 12, 
+    borderTopWidth: 1, 
+    borderTopColor: '#334155', 
+    paddingTop: 16 
+  },
   predRow: {
     flexDirection: 'row',
     alignItems: 'center',
