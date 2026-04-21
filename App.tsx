@@ -204,7 +204,7 @@ function Dashboard() {
         {/* Prediction Results */}
         {result && !isLoading && (
           <>
-            <PredictionResults result={result} />
+            <PredictionResults result={result} originalImageUri={preview} />
 
             <TouchableOpacity
               style={styles.clearButton}

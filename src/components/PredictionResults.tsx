@@ -7,13 +7,44 @@ import {
   StyleSheet,
   TouchableOpacity,
 } from 'react-native';
+import { generateProfessionalReport } from '../utils/reportGenerator';
 
-// ... (keep interfaces the same)
+export interface ClassPrediction {
+  class_index: number;
+  class_label: string;
+  confidence: number;
+}
 
-export function PredictionResults({ result }: PredictionResultsProps) {
+export interface PredictionResult {
+  predicted_class: string;
+  class_index: number;
+  confidence: number;
+  all_predictions: ClassPrediction[];
+  explainability_maps?: Record<string, string>;
+  inference_time_ms: number;
+  model_type: string;
+  image_info: {
+    width: number;
+    height: number;
+    format: string;
+  };
+}
+
+interface PredictionResultsProps {
+  result: PredictionResult;
+  originalImageUri: string | null;
+}
+
+export function PredictionResults({ result, originalImageUri }: PredictionResultsProps) {
   const [showAllPredictions, setShowAllPredictions] = useState(false);
   const confidencePercent = Math.round(result.confidence * 100);
   const modelDisplayName = result.model_type.toUpperCase();
+
+  const handleExportPDF = async () => {
+    if (originalImageUri) {
+      await generateProfessionalReport(result, originalImageUri);
+    }
+  };
 
   return (
     <View style={styles.wrapper}>
@@ -44,6 +75,15 @@ export function PredictionResults({ result }: PredictionResultsProps) {
         {/* Segmented arc gauge (premium look) */}
         <SegmentedGauge percent={confidencePercent} />
       </View>
+
+      {/* ── Export Report Button ── */}
+      <TouchableOpacity 
+        style={styles.exportPdfButton} 
+        onPress={handleExportPDF}
+        activeOpacity={0.8}
+      >
+        <Text style={styles.exportPdfText}>📄  Export Professional PDF Report</Text>
+      </TouchableOpacity>
 
       {/* ── Visual Explanations (XAI Maps) ── */}
       {result.explainability_maps && Object.keys(result.explainability_maps).length > 0 && (
@@ -378,5 +418,21 @@ const styles = StyleSheet.create({
   metricsGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
+  },
+  exportPdfButton: {
+    backgroundColor: 'rgba(79, 70, 229, 0.2)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#4f46e5',
+    paddingVertical: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 4,
+  },
+  exportPdfText: {
+    color: '#a5b4fc',
+    fontSize: 14,
+    fontWeight: '700',
+    letterSpacing: 0.3,
   },
 });
